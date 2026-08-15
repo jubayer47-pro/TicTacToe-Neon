@@ -82,8 +82,8 @@ jobs:
                   applicationId = "com.tictactoeneon.app"
                   minSdk = 23
                   targetSdk = 35
-                  versionCode = 1
-                  versionName = "1.0"
+                  versionCode = 2
+                  versionName = "1.1"
               }
 
               signingConfigs {
@@ -107,6 +107,10 @@ jobs:
                   targetCompatibility = JavaVersion.VERSION_17
               }
           }
+
+          dependencies {
+              implementation("com.google.android.gms:play-services-ads:24.5.0")
+          }
           EOF
 
       - name: Create MainActivity
@@ -120,19 +124,37 @@ jobs:
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
 
+          import com.google.android.gms.ads.AdRequest;
+          import com.google.android.gms.ads.MobileAds;
+          import com.google.android.gms.ads.LoadAdError;
+          import com.google.android.gms.ads.interstitial.InterstitialAd;
+          import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback;
+          import com.google.android.gms.ads.rewarded.RewardItem;
+          import com.google.android.gms.ads.rewarded.RewardedAd;
+          import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback;
+
           public class MainActivity extends Activity {
 
               private WebView webView;
+              private InterstitialAd interstitialAd;
+              private RewardedAd rewardedAd;
+
+              private static final String INTERSTITIAL_ID =
+                      "ca-app-pub-7009578840220882/9661363983";
+
+              private static final String REWARDED_ID =
+                      "ca-app-pub-7009578840220882/6459847546";
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
 
+                  MobileAds.initialize(this, initializationStatus -> {});
+
                   webView = new WebView(this);
                   setContentView(webView);
 
                   WebSettings settings = webView.getSettings();
-
                   settings.setJavaScriptEnabled(true);
                   settings.setDomStorageEnabled(true);
                   settings.setDatabaseEnabled(true);
@@ -144,6 +166,74 @@ jobs:
                   webView.loadUrl(
                       "https://jubayer47-pro.github.io/TicTacToe-Neon/"
                   );
+
+                  loadInterstitial();
+                  loadRewarded();
+              }
+
+              private void loadInterstitial() {
+                  AdRequest adRequest = new AdRequest.Builder().build();
+
+                  InterstitialAd.load(
+                      this,
+                      INTERSTITIAL_ID,
+                      adRequest,
+                      new InterstitialAdLoadCallback() {
+                          @Override
+                          public void onAdLoaded(InterstitialAd ad) {
+                              interstitialAd = ad;
+                          }
+
+                          @Override
+                          public void onAdFailedToLoad(LoadAdError error) {
+                              interstitialAd = null;
+                          }
+                      }
+                  );
+              }
+
+              private void loadRewarded() {
+                  AdRequest adRequest = new AdRequest.Builder().build();
+
+                  RewardedAd.load(
+                      this,
+                      REWARDED_ID,
+                      adRequest,
+                      new RewardedAdLoadCallback() {
+                          @Override
+                          public void onAdLoaded(RewardedAd ad) {
+                              rewardedAd = ad;
+                          }
+
+                          @Override
+                          public void onAdFailedToLoad(LoadAdError error) {
+                              rewardedAd = null;
+                          }
+                      }
+                  );
+              }
+
+              public void showGameOverAd() {
+                  if (interstitialAd != null) {
+                      interstitialAd.show(this);
+                      interstitialAd = null;
+                      loadInterstitial();
+                  }
+              }
+
+              public void showRewardedAd() {
+                  if (rewardedAd != null) {
+                      rewardedAd.show(
+                          this,
+                          rewardItem -> {
+                              // Reward handling will be connected
+                              // to the game logic separately.
+                          }
+                      );
+
+                      rewardedAd = null;
+                      loadRewarded();
+                  }
               }
 
               @Override
@@ -171,6 +261,10 @@ jobs:
                   android:roundIcon="@drawable/app_icon"
                   android:label="@string/app_name"
                   android:theme="@style/AppTheme">
+
+                  <meta-data
+                      android:name="com.google.android.gms.ads.APPLICATION_ID"
+                      android:value="ca-app-pub-7009578840220882~9991898447" />
 
                   <activity
                       android:name=".MainActivity"
@@ -228,7 +322,7 @@ jobs:
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
-          name: TicTacToe-Neon-AAB
+          name: TicTacToe-Neon-AAB-AdMob
           path: app/build/outputs/bundle/release/*.aab
 
       - name: Upload signing key
