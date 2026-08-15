@@ -32,7 +32,7 @@ jobs:
           mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/values
 
-      - - name: Copy app icon
+      - name: Copy app icon
         run: |
           cp tic-tac-toe-icon-512x512-1.png app/src/main/res/drawable/app_icon.png
 
@@ -137,7 +137,6 @@ jobs:
           import com.google.android.gms.ads.LoadAdError;
           import com.google.android.gms.ads.interstitial.InterstitialAd;
           import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback;
-          import com.google.android.gms.ads.rewarded.RewardItem;
           import com.google.android.gms.ads.rewarded.RewardedAd;
           import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback;
 
@@ -234,8 +233,7 @@ jobs:
                       rewardedAd.show(
                           this,
                           rewardItem -> {
-                              // Reward handling will be connected
-                              // to the game logic separately.
+                              // Reward will be connected to game logic later.
                           }
                       );
 
