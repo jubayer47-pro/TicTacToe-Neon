@@ -32,9 +32,17 @@ jobs:
           mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/values
 
-      - name: Copy app icon
+      - - name: Copy app icon
         run: |
           cp tic-tac-toe-icon-512x512-1.png app/src/main/res/drawable/app_icon.png
+
+      - name: Enable AndroidX
+        run: |
+          cat > gradle.properties <<'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx2048m
+          EOF
 
       - name: Create settings.gradle.kts
         run: |
