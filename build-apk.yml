@@ -1,4 +1,4 @@
-name: Build TicTacToe Neon APK
+name: Build TicTacToe Neon AAB + APK
 
 on:
   workflow_dispatch:
@@ -12,30 +12,36 @@ jobs:
 
     steps:
 
+      # 1. Checkout
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Java 17
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
+      # 3. Gradle
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
-      - name: Create Android project
+      # 4. Create Android folders
+      - name: Create Android project folders
         run: |
           mkdir -p app/src/main/java/com/tictactoeneon/app
           mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/values
 
+      # 5. Copy app icon
       - name: Copy app icon
         run: |
           cp tic-tac-toe-icon-512x512-1.png app/src/main/res/drawable/app_icon.png
 
+      # 6. AndroidX
       - name: Enable AndroidX
         run: |
           cat > gradle.properties <<'EOF'
@@ -44,6 +50,7 @@ jobs:
           org.gradle.jvmargs=-Xmx2048m
           EOF
 
+      # 7. settings.gradle.kts
       - name: Create settings.gradle.kts
         run: |
           cat > settings.gradle.kts <<'EOF'
@@ -67,6 +74,7 @@ jobs:
           include(":app")
           EOF
 
+      # 8. Root Gradle
       - name: Create root Gradle file
         run: |
           cat > build.gradle.kts <<'EOF'
@@ -75,6 +83,7 @@ jobs:
           }
           EOF
 
+      # 9. App Gradle
       - name: Create app Gradle file
         run: |
           cat > app/build.gradle.kts <<'EOF'
@@ -121,6 +130,7 @@ jobs:
           }
           EOF
 
+      # 10. MainActivity
       - name: Create MainActivity
         run: |
           cat > app/src/main/java/com/tictactoeneon/app/MainActivity.java <<'EOF'
@@ -179,13 +189,14 @@ jobs:
               }
 
               private void loadInterstitial() {
-                  AdRequest request = new AdRequest.Builder().build();
+                  AdRequest adRequest = new AdRequest.Builder().build();
 
                   InterstitialAd.load(
                       this,
                       INTERSTITIAL_ID,
-                      request,
+                      adRequest,
                       new InterstitialAdLoadCallback() {
+
                           @Override
                           public void onAdLoaded(InterstitialAd ad) {
                               interstitialAd = ad;
@@ -200,13 +211,14 @@ jobs:
               }
 
               private void loadRewarded() {
-                  AdRequest request = new AdRequest.Builder().build();
+                  AdRequest adRequest = new AdRequest.Builder().build();
 
                   RewardedAd.load(
                       this,
                       REWARDED_ID,
-                      request,
+                      adRequest,
                       new RewardedAdLoadCallback() {
+
                           @Override
                           public void onAdLoaded(RewardedAd ad) {
                               rewardedAd = ad;
@@ -219,9 +231,41 @@ jobs:
                       }
                   );
               }
+
+              public void showGameOverAd() {
+                  if (interstitialAd != null) {
+                      interstitialAd.show(this);
+                      interstitialAd = null;
+                      loadInterstitial();
+                  }
+              }
+
+              public void showRewardedAd() {
+                  if (rewardedAd != null) {
+                      rewardedAd.show(
+                          this,
+                          rewardItem -> {
+                              // Reward handling can be connected later.
+                          }
+                      );
+
+                      rewardedAd = null;
+                      loadRewarded();
+                  }
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (webView.canGoBack()) {
+                      webView.goBack();
+                  } else {
+                      super.onBackPressed();
+                  }
+              }
           }
           EOF
 
+      # 11. AndroidManifest
       - name: Create AndroidManifest
         run: |
           cat > app/src/main/AndroidManifest.xml <<'EOF'
@@ -257,6 +301,7 @@ jobs:
           </manifest>
           EOF
 
+      # 12. Android resources
       - name: Create Android resources
         run: |
           cat > app/src/main/res/values/strings.xml <<'EOF'
@@ -277,6 +322,7 @@ jobs:
           </resources>
           EOF
 
+      # 13. Generate signing key
       - name: Generate signing key
         run: |
           keytool -genkeypair \
@@ -290,22 +336,26 @@ jobs:
             -keypass changeit \
             -dname "CN=TicTacToe Neon, OU=App, O=Jubayer, L=Dhaka, ST=Dhaka, C=BD"
 
-      - name: Build APK and AAB
+      # 14. Build AAB + APK
+      - name: Build signed AAB and APK
         run: |
-          gradle :app:assembleRelease :app:bundleRelease --no-daemon
+          gradle :app:bundleRelease :app:assembleRelease --no-daemon
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: TicTacToe-Neon-APK-AdMob
-          path: app/build/outputs/apk/release/*.apk
-
+      # 15. Upload AAB
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: TicTacToe-Neon-AAB-AdMob
           path: app/build/outputs/bundle/release/*.aab
 
+      # 16. Upload APK
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TicTacToe-Neon-APK-AdMob
+          path: app/build/outputs/apk/release/*.apk
+
+      # 17. Upload signing key
       - name: Upload signing key
         uses: actions/upload-artifact@v4
         with:
