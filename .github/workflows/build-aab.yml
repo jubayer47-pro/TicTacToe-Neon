@@ -1,0 +1,211 @@
+name: Build TicTacToe Neon AAB
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout website
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Create Android project
+        run: |
+          mkdir -p app/src/main/java/com/tictactoeneon/app
+          mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/res/mipmap-hdpi
+          mkdir -p app/src/main/res/mipmap-mdpi
+          mkdir -p app/src/main/res/mipmap-xhdpi
+          mkdir -p app/src/main/res/mipmap-xxhdpi
+          mkdir -p app/src/main/res/mipmap-xxxhdpi
+          mkdir -p app/src/main/res/values
+
+      - name: Copy website files
+        run: |
+          mkdir -p app/src/main/assets
+          cp index.html app/src/main/assets/index.html
+          cp manifest.json app/src/main/assets/manifest.json || true
+          cp sw.js app/src/main/assets/sw.js || true
+
+      - name: Copy app icon
+        run: |
+          cp tic-tac-toe-icon-512x512-1.png app/src/main/res/drawable/app_icon.png
+
+      - name: Create Gradle files
+        run: |
+          cat > settings.gradle.kts <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+
+          rootProject.name = "TicTacToeNeon"
+          include(":app")
+          EOF
+
+          cat > build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application") version "8.7.3" apply false
+          }
+          EOF
+
+          cat > app/build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application")
+          }
+
+          android {
+              namespace = "com.tictactoeneon.app"
+              compileSdk = 35
+
+              defaultConfig {
+                  applicationId = "com.tictactoeneon.app"
+                  minSdk = 23
+                  targetSdk = 35
+                  versionCode = 1
+                  versionName = "2.0"
+              }
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+
+              buildTypes {
+                  release {
+                      isMinifyEnabled = false
+                  }
+              }
+          }
+
+          dependencies {
+              implementation("com.google.androidbrowserhelper:androidbrowserhelper:2.6.2")
+          }
+          EOF
+
+      - name: Create Android activity
+        run: |
+          cat > app/src/main/java/com/tictactoeneon/app/MainActivity.java <<'EOF'
+          package com.tictactoeneon.app;
+
+          import com.google.androidbrowserhelper.trusted.LauncherActivity;
+
+          public class MainActivity extends LauncherActivity {
+          }
+          EOF
+
+      - name: Create Android resources
+        run: |
+          cat > app/src/main/res/values/strings.xml <<'EOF'
+          <resources>
+              <string name="app_name">Tic Tac Toe Neon</string>
+          </resources>
+          EOF
+
+          cat > app/src/main/res/values/colors.xml <<'EOF'
+          <resources>
+              <color name="purple_500">#7C3AED</color>
+          </resources>
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <application
+                  android:theme="@style/AppTheme"
+                  android:label="@string/app_name"
+                  android:icon="@drawable/app_icon"
+                  android:roundIcon="@drawable/app_icon">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+
+                      <meta-data
+                          android:name="android.support.customtabs.trusted.DEFAULT_URL"
+                          android:value="https://jubayer47-pro.github.io/TicTacToe-Neon/" />
+
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+
+                  </activity>
+
+              </application>
+
+          </manifest>
+          EOF
+
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <resources>
+              <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:colorAccent">#7C3AED</item>
+                  <item name="android:statusBarColor">#000000</item>
+                  <item name="android:navigationBarColor">#000000</item>
+              </style>
+          </resources>
+          EOF
+
+      - name: Generate signing key
+        run: |
+          keytool -genkeypair \
+            -v \
+            -keystore upload-keystore.jks \
+            -alias upload \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass changeit \
+            -keypass changeit \
+            -dname "CN=TicTacToe Neon, OU=App, O=Jubayer, L=Dhaka, ST=Dhaka, C=BD"
+
+      - name: Build signed AAB
+        run: |
+          gradle :app:bundleRelease \
+            -Pandroid.injected.signing.store.file="$GITHUB_WORKSPACE/upload-keystore.jks" \
+            -Pandroid.injected.signing.store.password=changeit \
+            -Pandroid.injected.signing.key.alias=upload \
+            -Pandroid.injected.signing.key.password=changeit \
+            --no-daemon
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: TicTacToe-Neon-AAB
+          path: app/build/outputs/bundle/release/*.aab
+
+      - name: Upload signing key
+        uses: actions/upload-artifact@v4
+        with:
+          name: TicTacToe-Neon-Upload-Key
+          path: upload-keystore.jks
